@@ -1,0 +1,26 @@
+@functions
+{
+    [ViewData]
+    public string Description { get; set; }
+
+    [ViewData]
+    public string Title { get; set; }
+
+    [ViewData]
+    public string Keywords { get; set; }
+
+    [ViewData(Key = "Author")]
+    public string AuthorName { get; set; }
+}
+
+<html>
+    <head>
+        <meta name="description" content="@Description" />
+        <meta name="keywords" content="@Keywords" />
+        <meta name="author" content="@AuthorName" />
+        <title>@Title</title>
+    </head>
+    <body>
+        @RenderBody()
+    </body>
+</html>

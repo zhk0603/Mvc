@@ -1,0 +1,21 @@
+@functions
+{
+    [ViewData]
+    public int Id { get; set; }
+
+    [ViewData]
+    public IList<string> AreaCodes { get; set; }
+}
+
+<div>
+    This value is set by the invoking page via asp-viewdata attribute
+    <span id="partial-id">@Id</span>
+</div>
+
+<div>
+    This value is transferred from the model to the partial
+    <span id="area-codes">@(string.Join(" ", AreaCodes))</span>
+</div>
+
+<partial name="_Partial2" asp-viewdata-caller="ViewContext.ExecutingFilePath" />
+

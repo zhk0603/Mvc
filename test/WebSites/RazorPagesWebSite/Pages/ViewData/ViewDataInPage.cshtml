@@ -1,0 +1,15 @@
+@page
+@model ViewDataInPage
+@{ 
+    Layout = "_Layout"; 
+    Model.Title = "Doing this should have no effect.";
+
+    // Read value set by PageHandler and modify it before going to layout.
+    Description += " and the Page.";
+}
+@functions 
+{
+    [ViewData]
+    public string Description { get; set; }
+}
+Hello from ViewDataInPage

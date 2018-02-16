@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -21,8 +22,11 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
     public class PartialTagHelper : TagHelper
     {
         private const string ForAttributeName = "asp-for";
+        private const string ViewDataDictionaryName = "asp-all-viewdata";
+        private const string ViewDataValuesPrefix = "asp-viewdata-";
         private readonly ICompositeViewEngine _viewEngine;
         private readonly IViewBufferScope _viewBufferScope;
+        private IDictionary<string, object> _viewDataValues;
 
         public PartialTagHelper(
             ICompositeViewEngine viewEngine,
@@ -43,14 +47,30 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
         [HtmlAttributeName(ForAttributeName)]
         public ModelExpression For { get; set; }
 
-        /// <summary>
-        /// A <see cref="ViewDataDictionary"/> to pass into the partial view.
-        /// </summary>
-        public ViewDataDictionary ViewData { get; set; }
-
         [HtmlAttributeNotBound]
         [ViewContext]
         public ViewContext ViewContext { get; set; }
+
+        /// <summary>
+        /// Values for <see cref="ViewDataDictionary"/>.
+        /// </summary>
+        [HtmlAttributeName(ViewDataDictionaryName, DictionaryAttributePrefix = ViewDataValuesPrefix)]
+        public IDictionary<string, object> ViewData
+        {
+            get
+            {
+                if (_viewDataValues == null)
+                {
+                    _viewDataValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                }
+
+                return _viewDataValues;
+            }
+            set
+            {
+                _viewDataValues = value;
+            }
+        }
 
         /// <inheritdoc />
         public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
@@ -99,12 +119,18 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             }
 
             var view = viewEngineResult.View;
-            // Determine which ViewData we should use to construct a new ViewData
-            var baseViewData = ViewData ?? ViewContext.ViewData;
 
             // Use the rendering View's model only if an asp-for expression does not exist
             var model = For != null ? For.Model : ViewContext.ViewData.Model;
-            var newViewData = new ViewDataDictionary<object>(baseViewData, model);
+            var newViewData = new ViewDataDictionary<object>(ViewContext.ViewData, model);
+            if (_viewDataValues != null)
+            {
+                foreach (var kvp in _viewDataValues)
+                {
+                    newViewData[kvp.Key] = kvp.Value;
+                }
+            }
+
             var partialViewContext = new ViewContext(ViewContext, view, newViewData, writer);
 
             if (For?.Name != null)

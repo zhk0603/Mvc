@@ -22,6 +22,7 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
         private readonly ViewComponentInvokerCache _viewComponentInvokerCache;
         private readonly DiagnosticSource _diagnosticSource;
         private readonly ILogger _logger;
+        private readonly ISourceBoundPropertyManager _propertyManager;
 
         /// <summary>
         /// Initializes a new instance of <see cref="DefaultViewComponentInvoker"/>.
@@ -30,6 +31,8 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
         /// <param name="viewComponentInvokerCache">The <see cref="ViewComponentInvokerCache"/>.</param>
         /// <param name="diagnosticSource">The <see cref="DiagnosticSource"/>.</param>
         /// <param name="logger">The <see cref="ILogger"/>.</param>
+        [Obsolete("This constructor is obsolete and will be removed in a future version.")]
+        // Clean up null checks for propertyManager in InvokeAsync when this constructor is removed.
         public DefaultViewComponentInvoker(
             IViewComponentFactory viewComponentFactory,
             ViewComponentInvokerCache viewComponentInvokerCache,
@@ -62,6 +65,28 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
             _logger = logger;
         }
 
+        /// <summary>
+        /// Initializes a new instance of <see cref="DefaultViewComponentInvoker"/>.
+        /// </summary>
+        /// <param name="viewComponentFactory">The <see cref="IViewComponentFactory"/>.</param>
+        /// <param name="viewComponentInvokerCache">The <see cref="ViewComponentInvokerCache"/>.</param>
+        /// <param name="propertyManager">The <see cref="ISourceBoundPropertyManager"/>.</param>
+        /// <param name="diagnosticSource">The <see cref="DiagnosticSource"/>.</param>
+        /// <param name="logger">The <see cref="ILogger"/>.</param>
+        public DefaultViewComponentInvoker(
+            IViewComponentFactory viewComponentFactory,
+            ViewComponentInvokerCache viewComponentInvokerCache,
+            ISourceBoundPropertyManager propertyManager,
+            DiagnosticSource diagnosticSource,
+            ILogger logger)
+        {
+            _viewComponentFactory = viewComponentFactory ?? throw new ArgumentNullException(nameof(viewComponentFactory));
+            _viewComponentInvokerCache = viewComponentInvokerCache ?? throw new ArgumentNullException(nameof(viewComponentInvokerCache));
+            _diagnosticSource = diagnosticSource ?? throw new ArgumentNullException(nameof(diagnosticSource));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _propertyManager = propertyManager ?? throw new ArgumentNullException(nameof(propertyManager));
+        }
+
         /// <inheritdoc />
         public async Task InvokeAsync(ViewComponentContext context)
         {
@@ -79,25 +104,30 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
                 throw new InvalidOperationException(Resources.ViewComponent_MustReturnValue);
             }
 
+            var component = _viewComponentFactory.CreateViewComponent(context);
+
+            var propertyContext = new SourceBoundPropertyContext(context.ViewContext, context.TempData, context.ViewData);
+            // _propertyManager may be null when invoked from legacy constructor.
+            _propertyManager?.Populate(component, propertyContext);
+
             IViewComponentResult result;
             if (executor.IsMethodAsync)
             {
-                result = await InvokeAsyncCore(executor, context);
+                result = await InvokeAsyncCore(executor, context, component);
             }
             else
             {
                 // We support falling back to synchronous if there is no InvokeAsync method, in this case we'll still
                 // execute the IViewResult asynchronously.
-                result = InvokeSyncCore(executor, context);
+                result = InvokeSyncCore(executor, context, component);
             }
+            _propertyManager?.Save(component, propertyContext);
 
             await result.ExecuteAsync(context);
         }
 
-        private async Task<IViewComponentResult> InvokeAsyncCore(ObjectMethodExecutor executor, ViewComponentContext context)
+        private async Task<IViewComponentResult> InvokeAsyncCore(ObjectMethodExecutor executor, ViewComponentContext context, object component)
         {
-            var component = _viewComponentFactory.CreateViewComponent(context);
-
             using (_logger.ViewComponentScope(context))
             {
                 var arguments = PrepareArguments(context.Arguments, executor);
@@ -137,10 +167,8 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
             }
         }
 
-        private IViewComponentResult InvokeSyncCore(ObjectMethodExecutor executor, ViewComponentContext context)
+        private IViewComponentResult InvokeSyncCore(ObjectMethodExecutor executor, ViewComponentContext context, object component)
         {
-            var component = _viewComponentFactory.CreateViewComponent(context);
-
             using (_logger.ViewComponentScope(context))
             {
                 var arguments = PrepareArguments(context.Arguments, executor);
@@ -177,20 +205,17 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
                 throw new InvalidOperationException(Resources.ViewComponent_MustReturnValue);
             }
 
-            var componentResult = value as IViewComponentResult;
-            if (componentResult != null)
+            if (value is IViewComponentResult componentResult)
             {
                 return componentResult;
             }
 
-            var stringResult = value as string;
-            if (stringResult != null)
+            if (value is string stringResult)
             {
                 return new ContentViewComponentResult(stringResult);
             }
 
-            var htmlContent = value as IHtmlContent;
-            if (htmlContent != null)
+            if (value is IHtmlContent htmlContent)
             {
                 return new HtmlContentViewComponentResult(htmlContent);
             }

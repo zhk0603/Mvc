@@ -3,6 +3,7 @@
 
 using System;
 using System.Diagnostics;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Mvc.ViewFeatures.Internal;
 using Microsoft.Extensions.Logging;
 
@@ -12,9 +13,11 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
     {
         private readonly IViewComponentFactory _viewComponentFactory;
         private readonly ViewComponentInvokerCache _viewComponentInvokerCache;
+        private readonly ISourceBoundPropertyManager _propertyManager;
         private readonly ILogger _logger;
         private readonly DiagnosticSource _diagnosticSource;
 
+        [Obsolete("This constructor is obsolete and will be removed in a future version.")]
         public DefaultViewComponentInvokerFactory(
             IViewComponentFactory viewComponentFactory,
             ViewComponentInvokerCache viewComponentInvokerCache,
@@ -48,6 +51,20 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
             _logger = loggerFactory.CreateLogger<DefaultViewComponentInvoker>();
         }
 
+        public DefaultViewComponentInvokerFactory(
+            IViewComponentFactory viewComponentFactory,
+            ViewComponentInvokerCache viewComponentInvokerCache,
+            ISourceBoundPropertyManager propertyManager,
+            DiagnosticSource diagnosticSource,
+            ILoggerFactory loggerFactory)
+        {
+            _viewComponentFactory = viewComponentFactory ?? throw new ArgumentNullException(nameof(viewComponentFactory));
+            _viewComponentInvokerCache = viewComponentInvokerCache ?? throw new ArgumentNullException(nameof(viewComponentInvokerCache));
+            _propertyManager = propertyManager ?? throw new ArgumentNullException(nameof(loggerFactory));
+            _diagnosticSource = diagnosticSource ?? throw new ArgumentNullException(nameof(diagnosticSource));
+            _logger = loggerFactory?.CreateLogger<DefaultViewComponentInvoker>() ?? throw new ArgumentNullException(nameof(loggerFactory));
+        }
+
         /// <inheritdoc />
         // We don't currently make use of the descriptor or the arguments here (they are available on the context).
         // We might do this some day to cache which method we select, so resist the urge to 'clean' this without
@@ -62,6 +79,7 @@ namespace Microsoft.AspNetCore.Mvc.ViewComponents
             return new DefaultViewComponentInvoker(
                 _viewComponentFactory,
                 _viewComponentInvokerCache,
+                _propertyManager,
                 _diagnosticSource,
                 _logger);
         }

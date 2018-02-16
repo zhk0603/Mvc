@@ -1,0 +1,5 @@
+@page
+@model ViewDataToPartial
+
+<partial name="_Partial1" asp-viewdata-id="42" />
+<partial name="_Partial2" asp-viewdata-caller="@ViewContext.ExecutingFilePath" />

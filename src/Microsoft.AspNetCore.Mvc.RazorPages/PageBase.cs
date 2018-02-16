@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Internal;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Microsoft.AspNetCore.Mvc.Razor;
+using Microsoft.AspNetCore.Mvc.Razor.Internal;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +24,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages
     /// <summary>
     /// A base class for a Razor page.
     /// </summary>
-    public abstract class PageBase : RazorPageBase
+    public abstract class PageBase : RazorPageBase, ISkipRazorPageActivation
     {
         private IObjectModelValidator _objectValidator;
         private IModelMetadataProvider _metadataProvider;

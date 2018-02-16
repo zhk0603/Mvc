@@ -484,5 +484,58 @@ Hello from /Pages/Shared/";
             // Assert
             Assert.Contains("Name is required", response);
         }
+
+        [Fact]
+        public async Task ViewDataAttributes_SetInPageModel_AreTransferedToLayout()
+        {
+            // Arrange
+            var document = await Client.GetHtmlDocumentAsync("/ViewData/ViewDataInPage");
+
+            // Assert
+            var description = document.QuerySelector("meta[name='description']").Attributes["content"];
+            Assert.Equal("Description set in handler and the Page.", description.Value);
+
+            var keywords = document.QuerySelector("meta[name='keywords']").Attributes["content"];
+            Assert.Equal("Value set in filter", keywords.Value);
+
+            var author = document.QuerySelector("meta[name='author']").Attributes["content"];
+            Assert.Equal("Property with key", author.Value);
+
+            var title = document.QuerySelector("title").TextContent;
+            Assert.Equal("Title with default value", title);
+        }
+
+        [Fact]
+        public async Task ViewDataAttributes_SetInPageWithoutModel_AreTransferedToLayout()
+        {
+            // Arrange
+            var document = await Client.GetHtmlDocumentAsync("/ViewData/ViewDataInPageWithoutModel");
+
+            // Assert
+            var description = document.QuerySelector("meta[name='description']").Attributes["content"];
+            Assert.Equal("Description set in page handler", description.Value);
+
+            var title = document.QuerySelector("title").TextContent;
+            Assert.Equal("Default value", title);
+        }
+
+        [Fact]
+        public async Task ViewDataAttributes_TransferedViaPartial()
+        {
+            // Arrange
+            var document = await Client.GetHtmlDocumentAsync("/ViewData/ViewDataToPartial");
+
+            // Assert
+            var description = document.QuerySelector("#partial-id").TextContent;
+            Assert.Equal("42", description);
+
+            var areaCodes = document.QuerySelector("#area-codes").TextContent;
+            Assert.Equal("206 425", areaCodes);
+
+            Assert.Collection(
+                document.QuerySelectorAll(".caller"),
+                caller => Assert.Equal("/Pages/ViewData/_Partial1.cshtml", caller.TextContent),
+                caller => Assert.Equal("/Pages/ViewData/ViewDataToPartial.cshtml", caller.TextContent));
+        }
     }
 }

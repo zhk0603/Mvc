@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc.Razor.Extensions;
 using Microsoft.AspNetCore.Mvc.Razor.Internal;
 using Microsoft.AspNetCore.Mvc.Razor.TagHelpers;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.Language;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Microsoft.Extensions.Caching.Memory;
@@ -153,12 +154,14 @@ namespace Microsoft.Extensions.DependencyInjection
                 var htmlEncoder = s.GetRequiredService<HtmlEncoder>();
                 var optionsAccessor = s.GetRequiredService<IOptions<RazorViewEngineOptions>>();
                 var razorFileSystem = s.GetRequiredService<RazorProjectFileSystem>();
+                var propertyManager = s.GetRequiredService<ISourceBoundPropertyManager>();
                 var loggerFactory = s.GetRequiredService<ILoggerFactory>();
                 var diagnosticSource = s.GetRequiredService<DiagnosticSource>();
 
-                var viewEngine = new RazorViewEngine(pageFactory, pageActivator, htmlEncoder, optionsAccessor, razorFileSystem, loggerFactory, diagnosticSource);
+                var viewEngine = new RazorViewEngine(pageFactory, pageActivator, propertyManager, htmlEncoder, optionsAccessor, razorFileSystem, loggerFactory, diagnosticSource);
                 return viewEngine;
             });
+
             services.TryAddSingleton<IViewCompilerProvider, RazorViewCompilerProvider>();
 
             // In the default scenario the following services are singleton by virtue of being initialized as part of
