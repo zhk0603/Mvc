@@ -216,7 +216,10 @@ namespace Microsoft.AspNetCore.Mvc
                 feature => Assert.IsType<ViewComponentFeatureProvider>(feature),
                 feature => Assert.IsType<MetadataReferenceFeatureProvider>(feature),
                 feature => Assert.IsType<TagHelperFeatureProvider>(feature),
+                feature => Assert.IsType<RazorCompiledItemFeatureProvider>(feature),
+#pragma warning disable CS0618 // Type or member is obsolete
                 feature => Assert.IsType<ViewsFeatureProvider>(feature));
+#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         [Fact]
@@ -439,6 +442,7 @@ namespace Microsoft.AspNetCore.Mvc
                             typeof(CorsApplicationModelProvider),
                             typeof(AuthorizationApplicationModelProvider),
                             typeof(TempDataApplicationModelProvider),
+                            typeof(ViewDataAttributeApplicationModelProvider),
                             typeof(ApiBehaviorApplicationModelProvider),
                         }
                     },
@@ -466,6 +470,7 @@ namespace Microsoft.AspNetCore.Mvc
                             typeof(AuthorizationPageApplicationModelProvider),
                             typeof(DefaultPageApplicationModelProvider),
                             typeof(TempDataFilterPageApplicationModelProvider),
+                            typeof(ViewDataAttributePageApplicationModelProvider),
                             typeof(ResponseCacheFilterApplicationModelProvider),
                         }
                     },

@@ -89,12 +89,12 @@ namespace Microsoft.AspNetCore.Mvc.ModelBinding.Test
                     "[14]property1[15]property2",
                     "prefix.property1[13]",
                     "prefix[14][15]",
-                    ".property5",
-                    ".property6Value",
+                    "property5",
+                    "property6Value",
                     "prefix.property2",
                     "prefix.propertyValue",
-                    ".property7.property8",
-                    ".property9.property10Value",
+                    "property7.property8",
+                    "property9.property10Value",
                 };
             }
         }
@@ -114,6 +114,22 @@ namespace Microsoft.AspNetCore.Mvc.ModelBinding.Test
             var valueProvider = Assert.Single(context.ValueProviders);
             var result = valueProvider.GetValue(key);
             Assert.Equal("found", (string)result);
+        }
+
+        [Fact]
+        public async Task CreatesValueProvider_WithCurrentCulture()
+        {
+            // Arrange
+            var context = CreateContext("application/x-www-form-urlencoded", formValues: _backingStore);
+            var factory = new JQueryFormValueProviderFactory();
+
+            // Act
+            await factory.CreateValueProviderAsync(context);
+
+            // Assert
+            var valueProvider = Assert.Single(context.ValueProviders);
+            var jqueryFormValueProvider = Assert.IsType<JQueryFormValueProvider>(valueProvider);
+            Assert.Equal(CultureInfo.CurrentCulture, jqueryFormValueProvider.Culture);
         }
 
         private static ValueProviderFactoryContext CreateContext(string contentType, Dictionary<string, StringValues> formValues)

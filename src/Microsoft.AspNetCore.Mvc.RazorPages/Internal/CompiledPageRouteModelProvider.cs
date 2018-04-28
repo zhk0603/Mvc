@@ -7,8 +7,10 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Razor.Compilation;
+using Microsoft.AspNetCore.Mvc.Razor.Extensions;
 using Microsoft.AspNetCore.Mvc.Razor.Internal;
 using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
+using Microsoft.AspNetCore.Razor.Hosting;
 using Microsoft.AspNetCore.Razor.Language;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -56,22 +58,55 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             }
         }
 
-        /// <summary>
-        /// Gets the sequence of <see cref="CompiledViewDescriptor"/> from <paramref name="applicationManager"/>.
-        /// </summary>
-        /// <param name="applicationManager">The <see cref="ApplicationPartManager"/>s</param>
-        /// <returns>The sequence of <see cref="CompiledViewDescriptor"/>.</returns>
-        protected virtual IEnumerable<CompiledViewDescriptor> GetViewDescriptors(ApplicationPartManager applicationManager)
+        private IEnumerable<CompiledViewDescriptor> GetViewDescriptors(ApplicationPartManager applicationManager)
         {
             if (applicationManager == null)
             {
                 throw new ArgumentNullException(nameof(applicationManager));
             }
 
+            var viewsFeature = GetViewFeature(applicationManager);
+
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var viewDescriptor in viewsFeature.ViewDescriptors)
+            {
+                if (!visited.Add(viewDescriptor.RelativePath))
+                {
+                    // Already seen an descriptor with a higher "order"
+                    continue;
+                }
+
+                if (!viewDescriptor.IsPrecompiled)
+                {
+                    continue;
+                }
+
+                if (IsRazorPage(viewDescriptor))
+                {
+                    yield return viewDescriptor;
+                }
+            }
+
+            bool IsRazorPage(CompiledViewDescriptor viewDescriptor)
+            {
+                if (viewDescriptor.Item != null)
+                {
+                    return viewDescriptor.Item.Kind == RazorPageDocumentClassifierPass.RazorPageDocumentKind;
+                }
+                else if (viewDescriptor.ViewAttribute != null)
+                {
+                    return viewDescriptor.ViewAttribute is RazorPageAttribute;
+                }
+
+                return false;
+            }
+        }
+
+        protected virtual ViewsFeature GetViewFeature(ApplicationPartManager applicationManager)
+        {
             var viewsFeature = new ViewsFeature();
             applicationManager.PopulateFeature(viewsFeature);
-
-            return viewsFeature.ViewDescriptors.Where(d => d.IsPrecompiled && d.ViewAttribute is RazorPageAttribute);
+            return viewsFeature;
         }
 
         private void CreateModels(PageRouteModelProviderContext context)
@@ -82,12 +117,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 rootDirectory = rootDirectory + "/";
             }
 
-            var areaRootDirectory = _pagesOptions.AreaRootDirectory;
-            if (!areaRootDirectory.EndsWith("/", StringComparison.Ordinal))
-            {
-                areaRootDirectory = areaRootDirectory + "/";
-            }
-
+            var areaRootDirectory = "/Areas/";
             foreach (var viewDescriptor in GetViewDescriptors(_applicationManager))
             {
                 if (viewDescriptor.Item != null && !ChecksumValidator.IsItemValid(_razorProjectEngine.FileSystem, viewDescriptor.Item))
@@ -96,18 +126,19 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     continue;
                 }
 
-                var pageAttribute = (RazorPageAttribute)viewDescriptor.ViewAttribute;
+                var relativePath = viewDescriptor.RelativePath;
+                var routeTemplate = GetRouteTemplate(viewDescriptor);
                 PageRouteModel routeModel = null;
 
                 // When RootDirectory and AreaRootDirectory overlap (e.g. RootDirectory = '/', AreaRootDirectory = '/Areas'), we
                 // only want to allow a page to be associated with the area route.
-                if (_pagesOptions.AllowAreas && viewDescriptor.RelativePath.StartsWith(areaRootDirectory, StringComparison.OrdinalIgnoreCase))
+                if (_pagesOptions.AllowAreas && relativePath.StartsWith(areaRootDirectory, StringComparison.OrdinalIgnoreCase))
                 {
-                    routeModel = _routeModelFactory.CreateAreaRouteModel(viewDescriptor.RelativePath, pageAttribute.RouteTemplate);
+                    routeModel = _routeModelFactory.CreateAreaRouteModel(relativePath, routeTemplate);
                 }
-                else if (viewDescriptor.RelativePath.StartsWith(rootDirectory, StringComparison.OrdinalIgnoreCase))
+                else if (relativePath.StartsWith(rootDirectory, StringComparison.OrdinalIgnoreCase))
                 {
-                    routeModel = _routeModelFactory.CreateRouteModel(pageAttribute.Path, pageAttribute.RouteTemplate);
+                    routeModel = _routeModelFactory.CreateRouteModel(relativePath, routeTemplate);
                 }
 
                 if (routeModel != null)
@@ -115,6 +146,24 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     context.RouteModels.Add(routeModel);
                 }
             }
+        }
+
+        internal static string GetRouteTemplate(CompiledViewDescriptor viewDescriptor)
+        {
+            if (viewDescriptor.ViewAttribute != null)
+            {
+                return ((RazorPageAttribute)viewDescriptor.ViewAttribute).RouteTemplate;
+            }
+
+            if (viewDescriptor.Item != null)
+            {
+                return viewDescriptor.Item.Metadata
+                    .OfType<RazorCompiledItemMetadataAttribute>()
+                    .FirstOrDefault(f => f.Key == RazorPageDocumentClassifierPass.RouteTemplateKey)
+                    ?.Value;
+            }
+
+            return null;
         }
     }
 }

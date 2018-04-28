@@ -13,7 +13,7 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
     {
         public RazorPagesWithBasePathTest(MvcTestFixture<RazorPagesWebSite.StartupWithBasePath> fixture)
         {
-            Client = fixture.Client;
+            Client = fixture.CreateDefaultClient();
         }
 
         public HttpClient Client { get; }
@@ -483,6 +483,74 @@ Hello from /Pages/Shared/";
 
             // Assert
             Assert.Contains("Name is required", response);
+        }
+
+        [Fact]
+        public async Task PagesFromClassLibraries_CanBeServed()
+        {
+            // Act
+            var response = await Client.GetStringAsync("/ClassLibraryPages/Served");
+
+            // Assert
+            Assert.Contains("This page is served from RazorPagesClassLibrary", response);
+        }
+
+        [Fact]
+        public async Task PagesFromClassLibraries_CanBeOverriden()
+        {
+            // Act
+            var response = await Client.GetStringAsync("/ClassLibraryPages/Overriden");
+
+            // Assert
+            Assert.Contains("This page is overriden by RazorPagesWebSite", response);
+        }
+
+        [Fact]
+        public async Task ViewDataAttributes_SetInPageModel_AreTransferedToLayout()
+        {
+            // Arrange
+            var document = await Client.GetHtmlDocumentAsync("/ViewData/ViewDataInPage");
+
+            // Assert
+            var description = document.QuerySelector("meta[name='description']").Attributes["content"];
+            Assert.Equal("Description set in handler", description.Value);
+
+            var keywords = document.QuerySelector("meta[name='keywords']").Attributes["content"];
+            Assert.Equal("Value set in filter", keywords.Value);
+
+            var author = document.QuerySelector("meta[name='author']").Attributes["content"];
+            Assert.Equal("Property with key", author.Value);
+
+            var title = document.QuerySelector("title").TextContent;
+            Assert.Equal("Title with default value", title);
+        }
+
+        [Fact]
+        public async Task ViewDataAttributes_SetInPageWithoutModel_AreTransferedToLayout()
+        {
+            // Arrange
+            var document = await Client.GetHtmlDocumentAsync("/ViewData/ViewDataInPageWithoutModel");
+
+            // Assert
+            var description = document.QuerySelector("meta[name='description']").Attributes["content"];
+            Assert.Equal("Description set in page handler", description.Value);
+
+            var title = document.QuerySelector("title").TextContent;
+            Assert.Equal("Default value", title);
+        }
+
+        [Fact]
+        public async Task ViewDataProperties_SetInPageModel_AreTransferredToViewComponents()
+        {
+            // Act
+            var document = await Client.GetHtmlDocumentAsync("ViewData/ViewDataToViewComponentPage");
+
+            // Assert
+            var message = document.QuerySelector("#message").TextContent;
+            Assert.Equal("Message set in handler", message);
+
+            var title = document.QuerySelector("title").TextContent;
+            Assert.Equal("View Data in Pages", title);
         }
     }
 }

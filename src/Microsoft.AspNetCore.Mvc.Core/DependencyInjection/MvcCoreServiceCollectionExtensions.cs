@@ -87,11 +87,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     return manager;
                 }
 
-                var parts = DefaultAssemblyPartDiscoveryProvider.DiscoverAssemblyParts(entryAssemblyName);
-                foreach (var part in parts)
-                {
-                    manager.ApplicationParts.Add(part);
-                }
+                manager.PopulateDefaultParts(entryAssemblyName);
             }
 
             return manager;
@@ -206,6 +202,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.TryAddSingleton<ControllerActionInvokerCache>();
             services.TryAddEnumerable(
                 ServiceDescriptor.Singleton<IFilterProvider, DefaultFilterProvider>());
+            services.TryAddSingleton<IActionResultTypeMapper, ActionResultTypeMapper>();
 
             //
             // Request body limit filters
@@ -213,9 +210,6 @@ namespace Microsoft.Extensions.DependencyInjection
             services.TryAddTransient<RequestSizeLimitFilter>();
             services.TryAddTransient<DisableRequestSizeLimitFilter>();
             services.TryAddTransient<RequestFormLimitsFilter>();
-
-            // Error description
-            services.TryAddSingleton<IErrorDescriptionFactory, DefaultErrorDescriptorFactory>();
 
             //
             // ModelBinding, Validation
@@ -235,15 +229,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 return new DefaultObjectValidator(metadataProvider, options.ModelValidatorProviders);
             });
             services.TryAddSingleton<ClientValidatorCache>();
-            services.TryAddSingleton<ParameterBinder>(s =>
-            {
-                var options = s.GetRequiredService<IOptions<MvcOptions>>().Value;
-                var loggerFactory = s.GetRequiredService<ILoggerFactory>();
-                var metadataProvider = s.GetRequiredService<IModelMetadataProvider>();
-                var modelBinderFactory = s.GetRequiredService<IModelBinderFactory>();
-                var modelValidatorProvider = new CompositeModelValidatorProvider(options.ModelValidatorProviders);
-                return new ParameterBinder(metadataProvider, modelBinderFactory, modelValidatorProvider, loggerFactory);
-            });
+            services.TryAddSingleton<ParameterBinder>();
 
             //
             // Random Infrastructure

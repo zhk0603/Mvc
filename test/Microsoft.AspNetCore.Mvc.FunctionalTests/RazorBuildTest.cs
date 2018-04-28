@@ -12,7 +12,7 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
     {
         public RazorBuildTest(MvcTestFixture<RazorBuildWebSite.Startup> fixture)
         {
-            Client = fixture.Client;
+            Client = fixture.CreateDefaultClient();
         }
 
         public HttpClient Client { get; }
@@ -63,6 +63,19 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.Equal("Hello from runtime-compiled rzc view!", responseBody.Trim());
+        }
+
+        [Fact]
+        public async Task RzcViewsArePreferredToPrecompiledViews()
+        {
+            // Verifies that when two views have the same paths, the one compiled using rzc is preferred to the one from Precompilation.
+            // Act
+            var response = await Client.GetAsync("http://localhost/Common/View");
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("Hello from buildtime-compiled rzc view!", responseBody.Trim());
         }
     }
 }

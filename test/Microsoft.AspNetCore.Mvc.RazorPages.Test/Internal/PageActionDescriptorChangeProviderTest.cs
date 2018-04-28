@@ -26,9 +26,10 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 .Returns(Mock.Of<IChangeToken>());
             var accessor = Mock.Of<IRazorViewEngineFileProviderAccessor>(a => a.FileProvider == fileProvider.Object);
 
+            var fileSystem = new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment);
             var templateEngine = new RazorTemplateEngine(
-                RazorEngine.Create(),
-                new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment));
+                RazorProjectEngine.Create(RazorConfiguration.Default, fileSystem).Engine,
+                fileSystem);
             var options = Options.Create(new RazorPagesOptions());
             var changeProvider = new PageActionDescriptorChangeProvider(templateEngine, accessor, options);
 
@@ -50,9 +51,10 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 .Returns(Mock.Of<IChangeToken>());
             var accessor = Mock.Of<IRazorViewEngineFileProviderAccessor>(a => a.FileProvider == fileProvider.Object);
 
+            var fileSystem = new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment);
             var templateEngine = new RazorTemplateEngine(
-                RazorEngine.Create(),
-                new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment));
+                RazorProjectEngine.Create(RazorConfiguration.Default, fileSystem).Engine,
+                fileSystem);
             var options = Options.Create(new RazorPagesOptions());
             options.Value.RootDirectory = rootDirectory;
 
@@ -74,9 +76,10 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 .Returns(Mock.Of<IChangeToken>());
             var accessor = Mock.Of<IRazorViewEngineFileProviderAccessor>(a => a.FileProvider == fileProvider.Object);
 
+            var fileSystem = new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment);
             var templateEngine = new RazorTemplateEngine(
-                RazorEngine.Create(),
-                new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment));
+                RazorProjectEngine.Create(RazorConfiguration.Default, fileSystem).Engine,
+                fileSystem);
             var options = Options.Create(new RazorPagesOptions { AllowAreas = true });
             var changeProvider = new PageActionDescriptorChangeProvider(templateEngine, accessor, options);
 
@@ -87,34 +90,6 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             fileProvider.Verify(f => f.Watch("/Areas/**/*.cshtml"));
         }
 
-        [Theory]
-        [InlineData("/areas-base-dir")]
-        [InlineData("/areas-base-dir/")]
-        public void GetChangeToken_WatchesFilesUnderCustomAreaRoot(string rootDirectory)
-        {
-            // Arrange
-            var fileProvider = new Mock<IFileProvider>();
-            fileProvider.Setup(f => f.Watch(It.IsAny<string>()))
-                .Returns(Mock.Of<IChangeToken>());
-            var accessor = Mock.Of<IRazorViewEngineFileProviderAccessor>(a => a.FileProvider == fileProvider.Object);
-
-            var templateEngine = new RazorTemplateEngine(
-                RazorEngine.Create(),
-                new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment));
-            var options = Options.Create(new RazorPagesOptions
-            {
-                AllowAreas = true,
-                AreaRootDirectory = rootDirectory,
-            });
-            var changeProvider = new PageActionDescriptorChangeProvider(templateEngine, accessor, options);
-
-            // Act
-            var changeToken = changeProvider.GetChangeToken();
-
-            // Assert
-            fileProvider.Verify(f => f.Watch("/areas-base-dir/**/*.cshtml"));
-        }
-
         [Fact]
         public void GetChangeToken_WatchesViewImportsOutsidePagesRoot_WhenPagesRootIsNested()
         {
@@ -122,9 +97,10 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             var fileProvider = new TestFileProvider();
             var accessor = Mock.Of<IRazorViewEngineFileProviderAccessor>(a => a.FileProvider == fileProvider);
 
+            var fileSystem = new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment);
             var templateEngine = new RazorTemplateEngine(
-                RazorEngine.Create(),
-                new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment));
+                RazorProjectEngine.Create(RazorConfiguration.Default, fileSystem).Engine,
+                fileSystem);
             templateEngine.Options.ImportsFileName = "_ViewImports.cshtml";
             var options = Options.Create(new RazorPagesOptions());
             options.Value.RootDirectory = "/dir1/dir2";
@@ -140,19 +116,19 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
         }
 
         [Fact]
-        public void GetChangeToken_WatchesViewImportsOutsidePagesRoot_WhenAreaPagesRootIsNested()
+        public void GetChangeToken_WatchesViewImportsOutsidePagesRoot_WhenAllowAreasIsSpecified()
         {
             // Arrange
             var fileProvider = new TestFileProvider();
             var accessor = Mock.Of<IRazorViewEngineFileProviderAccessor>(a => a.FileProvider == fileProvider);
 
+            var fileSystem = new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment);
             var templateEngine = new RazorTemplateEngine(
-                RazorEngine.Create(),
-                new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment));
+                RazorProjectEngine.Create(RazorConfiguration.Default, fileSystem).Engine,
+                fileSystem);
             templateEngine.Options.ImportsFileName = "_ViewImports.cshtml";
             var options = Options.Create(new RazorPagesOptions());
             options.Value.RootDirectory = "/dir1/dir2";
-            options.Value.AreaRootDirectory = "/dir3/dir4";
             options.Value.AllowAreas = true;
 
             var changeProvider = new PageActionDescriptorChangeProvider(templateEngine, accessor, options);
@@ -162,9 +138,8 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             Assert.Collection(compositeChangeToken.ChangeTokens,
                 changeToken => Assert.Same(fileProvider.GetChangeToken("/dir1/_ViewImports.cshtml"), changeToken),
                 changeToken => Assert.Same(fileProvider.GetChangeToken("/_ViewImports.cshtml"), changeToken),
-                changeToken => Assert.Same(fileProvider.GetChangeToken("/dir3/_ViewImports.cshtml"), changeToken),
                 changeToken => Assert.Same(fileProvider.GetChangeToken("/dir1/dir2/**/*.cshtml"), changeToken),
-                changeToken => Assert.Same(fileProvider.GetChangeToken("/dir3/dir4/**/*.cshtml"), changeToken));
+                changeToken => Assert.Same(fileProvider.GetChangeToken("/Areas/**/*.cshtml"), changeToken));
         }
 
         [Fact]
@@ -174,9 +149,10 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             var fileProvider = new TestFileProvider();
             var accessor = Mock.Of<IRazorViewEngineFileProviderAccessor>(a => a.FileProvider == fileProvider);
 
+            var fileSystem = new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment);
             var templateEngine = new RazorTemplateEngine(
-                RazorEngine.Create(),
-                new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment));
+                RazorProjectEngine.Create(RazorConfiguration.Default, fileSystem).Engine,
+                fileSystem);
             templateEngine.Options.ImportsFileName = "_ViewImports.cshtml";
             var options = Options.Create(new RazorPagesOptions { AllowAreas = false });
 

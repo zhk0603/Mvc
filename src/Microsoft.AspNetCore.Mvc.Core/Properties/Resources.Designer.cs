@@ -1273,16 +1273,16 @@ namespace Microsoft.AspNetCore.Mvc.Core
         /// <summary>
         /// Could not create an instance of type '{0}'. Model bound complex types must not be abstract or value types and must have a parameterless constructor.
         /// </summary>
-        internal static string ComplexTypeModelBinder_NoParameterlessConstructor_TopLevelObject
+        internal static string ComplexTypeModelBinder_NoParameterlessConstructor_ForType
         {
-            get => GetString("ComplexTypeModelBinder_NoParameterlessConstructor_TopLevelObject");
+            get => GetString("ComplexTypeModelBinder_NoParameterlessConstructor_ForType");
         }
 
         /// <summary>
         /// Could not create an instance of type '{0}'. Model bound complex types must not be abstract or value types and must have a parameterless constructor.
         /// </summary>
-        internal static string FormatComplexTypeModelBinder_NoParameterlessConstructor_TopLevelObject(object p0)
-            => string.Format(CultureInfo.CurrentCulture, GetString("ComplexTypeModelBinder_NoParameterlessConstructor_TopLevelObject"), p0);
+        internal static string FormatComplexTypeModelBinder_NoParameterlessConstructor_ForType(object p0)
+            => string.Format(CultureInfo.CurrentCulture, GetString("ComplexTypeModelBinder_NoParameterlessConstructor_ForType"), p0);
 
         /// <summary>
         /// Could not create an instance of type '{0}'. Model bound complex types must not be abstract or value types and must have a parameterless constructor. Alternatively, set the '{1}' property to a non-null value in the '{2}' constructor.
@@ -1367,6 +1367,104 @@ namespace Microsoft.AspNetCore.Mvc.Core
         /// </summary>
         internal static string FormatVirtualFileResultExecutor_NoFileProviderConfigured()
             => GetString("VirtualFileResultExecutor_NoFileProviderConfigured");
+
+        /// <summary>
+        /// Type {0} specified by {1} is invalid. Type specified by {1} must derive from {2}.
+        /// </summary>
+        internal static string ApplicationPartFactory_InvalidFactoryType
+        {
+            get => GetString("ApplicationPartFactory_InvalidFactoryType");
+        }
+
+        /// <summary>
+        /// Type {0} specified by {1} is invalid. Type specified by {1} must derive from {2}.
+        /// </summary>
+        internal static string FormatApplicationPartFactory_InvalidFactoryType(object p0, object p1, object p2)
+            => string.Format(CultureInfo.CurrentCulture, GetString("ApplicationPartFactory_InvalidFactoryType"), p0, p1, p2);
+
+        /// <summary>
+        /// {0} specified on {1} cannot be self referential.
+        /// </summary>
+        internal static string RelatedAssemblyAttribute_AssemblyCannotReferenceSelf
+        {
+            get => GetString("RelatedAssemblyAttribute_AssemblyCannotReferenceSelf");
+        }
+
+        /// <summary>
+        /// {0} specified on {1} cannot be self referential.
+        /// </summary>
+        internal static string FormatRelatedAssemblyAttribute_AssemblyCannotReferenceSelf(object p0, object p1)
+            => string.Format(CultureInfo.CurrentCulture, GetString("RelatedAssemblyAttribute_AssemblyCannotReferenceSelf"), p0, p1);
+
+        /// <summary>
+        /// Related assembly '{0}' specified by assembly '{1}' could not be found in the directory {2}. Related assemblies must be co-located with the specifying assemblies.
+        /// </summary>
+        internal static string RelatedAssemblyAttribute_CouldNotBeFound
+        {
+            get => GetString("RelatedAssemblyAttribute_CouldNotBeFound");
+        }
+
+        /// <summary>
+        /// Related assembly '{0}' specified by assembly '{1}' could not be found in the directory {2}. Related assemblies must be co-located with the specifying assemblies.
+        /// </summary>
+        internal static string FormatRelatedAssemblyAttribute_CouldNotBeFound(object p0, object p1, object p2)
+            => string.Format(CultureInfo.CurrentCulture, GetString("RelatedAssemblyAttribute_CouldNotBeFound"), p0, p1, p2);
+
+        /// <summary>
+        /// Each related assembly must be declared by exactly one assembly. The assembly '{0}' was declared as related assembly by the following:
+        /// </summary>
+        internal static string ApplicationAssembliesProvider_DuplicateRelatedAssembly
+        {
+            get => GetString("ApplicationAssembliesProvider_DuplicateRelatedAssembly");
+        }
+
+        /// <summary>
+        /// Each related assembly must be declared by exactly one assembly. The assembly '{0}' was declared as related assembly by the following:
+        /// </summary>
+        internal static string FormatApplicationAssembliesProvider_DuplicateRelatedAssembly(object p0)
+            => string.Format(CultureInfo.CurrentCulture, GetString("ApplicationAssembliesProvider_DuplicateRelatedAssembly"), p0);
+
+        /// <summary>
+        /// Assembly '{0}' declared as a related assembly by assembly '{1}' cannot define additional related assemblies.
+        /// </summary>
+        internal static string ApplicationAssembliesProvider_RelatedAssemblyCannotDefineAdditional
+        {
+            get => GetString("ApplicationAssembliesProvider_RelatedAssemblyCannotDefineAdditional");
+        }
+
+        /// <summary>
+        /// Assembly '{0}' declared as a related assembly by assembly '{1}' cannot define additional related assemblies.
+        /// </summary>
+        internal static string FormatApplicationAssembliesProvider_RelatedAssemblyCannotDefineAdditional(object p0, object p1)
+            => string.Format(CultureInfo.CurrentCulture, GetString("ApplicationAssembliesProvider_RelatedAssemblyCannotDefineAdditional"), p0, p1);
+
+        /// <summary>
+        /// Could not create an instance of type '{0}'. Model bound complex types must not be abstract or value types and must have a parameterless constructor. Alternatively, give the '{1}' parameter a non-null default value.
+        /// </summary>
+        internal static string ComplexTypeModelBinder_NoParameterlessConstructor_ForParameter
+        {
+            get => GetString("ComplexTypeModelBinder_NoParameterlessConstructor_ForParameter");
+        }
+
+        /// <summary>
+        /// Could not create an instance of type '{0}'. Model bound complex types must not be abstract or value types and must have a parameterless constructor. Alternatively, give the '{1}' parameter a non-null default value.
+        /// </summary>
+        internal static string FormatComplexTypeModelBinder_NoParameterlessConstructor_ForParameter(object p0, object p1)
+            => string.Format(CultureInfo.CurrentCulture, GetString("ComplexTypeModelBinder_NoParameterlessConstructor_ForParameter"), p0, p1);
+
+        /// <summary>
+        /// Action '{0}' has more than one parameter that were specified or inferred as bound from request body. Only one parameter per action may be bound from body. Inspect the following parameters, and use '{1}' to specify query string bound, '{2}' to specify route bound, and '{3}' for parameters to be bound from body:
+        /// </summary>
+        internal static string ApiController_MultipleBodyParametersFound
+        {
+            get => GetString("ApiController_MultipleBodyParametersFound");
+        }
+
+        /// <summary>
+        /// Action '{0}' has more than one parameter that were specified or inferred as bound from request body. Only one parameter per action may be bound from body. Inspect the following parameters, and use '{1}' to specify query string bound, '{2}' to specify route bound, and '{3}' for parameters to be bound from body:
+        /// </summary>
+        internal static string FormatApiController_MultipleBodyParametersFound(object p0, object p1, object p2, object p3)
+            => string.Format(CultureInfo.CurrentCulture, GetString("ApiController_MultipleBodyParametersFound"), p0, p1, p2, p3);
 
         private static string GetString(string name, params string[] formatterNames)
         {

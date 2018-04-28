@@ -20,7 +20,13 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
     [HtmlTargetElement("partial", Attributes = "name", TagStructure = TagStructure.WithoutEndTag)]
     public class PartialTagHelper : TagHelper
     {
-        private const string ForAttributeName = "asp-for";
+        private const string ForAttributeName = "for";
+        private const string ModelAttributeName = "model";
+        private object _model;
+        private bool _hasModel;
+        private bool _hasFor;
+        private ModelExpression _for;
+
         private readonly ICompositeViewEngine _viewEngine;
         private readonly IViewBufferScope _viewBufferScope;
 
@@ -38,10 +44,32 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
         public string Name { get; set; }
 
         /// <summary>
-        /// An expression to be evaluated against the current model.
+        /// An expression to be evaluated against the current model. Cannot be used together with <see cref="Model"/>.
         /// </summary>
         [HtmlAttributeName(ForAttributeName)]
-        public ModelExpression For { get; set; }
+        public ModelExpression For
+        {
+            get => _for;
+            set
+            {
+                _for = value ?? throw new ArgumentNullException(nameof(value));
+                _hasFor = true;
+            }
+        }
+
+        /// <summary>
+        /// The model to pass into the partial view. Cannot be used together with <see cref="For"/>.
+        /// </summary>
+        [HtmlAttributeName(ModelAttributeName)]
+        public object Model
+        {
+            get => _model;
+            set
+            {
+                _model = value;
+                _hasModel = true;
+            }
+        }
 
         /// <summary>
         /// A <see cref="ViewDataDictionary"/> to pass into the partial view.
@@ -65,10 +93,11 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
                 throw new ArgumentNullException(nameof(context));
             }
 
+            var model = ResolveModel();
             var viewBuffer = new ViewBuffer(_viewBufferScope, Name, ViewBuffer.PartialViewPageSize);
             using (var writer = new ViewBufferTextWriter(viewBuffer, Encoding.UTF8))
             {
-                await RenderPartialViewAsync(writer);
+                await RenderPartialViewAsync(writer, model);
 
                 // Reset the TagName. We don't want `partial` to render.
                 output.TagName = null;
@@ -76,7 +105,38 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             }
         }
 
-        private async Task RenderPartialViewAsync(TextWriter writer)
+        // Internal for testing
+        internal object ResolveModel()
+        {
+            // 1. Disallow specifying values for both Model and For
+            // 2. If a Model was assigned, use it even if it's null.
+            // 3. For cannot have a null value. Use it if it was assigned to.
+            // 4. Fall back to using the Model property on ViewContext.ViewData if none of the above conditions are met.
+
+            if (_hasFor && _hasModel)
+            {
+                throw new InvalidOperationException(
+                    Resources.FormatPartialTagHelper_InvalidModelAttributes(
+                        typeof(PartialTagHelper).FullName,
+                        ForAttributeName,
+                        ModelAttributeName));
+            }
+
+            if (_hasModel)
+            {
+                return Model;
+            }
+
+            if (_hasFor)
+            {
+                return For.Model;
+            }
+
+            // A value for Model or For was not specified, fallback to the ViewContext's ViewData model.
+            return ViewContext.ViewData.Model;
+        }
+
+        private async Task RenderPartialViewAsync(TextWriter writer, object model)
         {
             var viewEngineResult = _viewEngine.GetView(ViewContext.ExecutingFilePath, Name, isMainPage: false);
             var getViewLocations = viewEngineResult.SearchedLocations;
@@ -101,9 +161,6 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             var view = viewEngineResult.View;
             // Determine which ViewData we should use to construct a new ViewData
             var baseViewData = ViewData ?? ViewContext.ViewData;
-
-            // Use the rendering View's model only if an asp-for expression does not exist
-            var model = For != null ? For.Model : ViewContext.ViewData.Model;
             var newViewData = new ViewDataDictionary<object>(baseViewData, model);
             var partialViewContext = new ViewContext(ViewContext, view, newViewData, writer);
 

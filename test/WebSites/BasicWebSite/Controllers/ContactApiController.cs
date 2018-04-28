@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using BasicWebSite.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -51,6 +52,10 @@ namespace BasicWebSite
         [HttpPost("ActionWithInferredFromBodyParameter")]
         public ActionResult<Contact> ActionWithInferredFromBodyParameter(Contact contact) => contact;
 
+        [HttpPost(nameof(ActionWithInferredFromBodyParameterAndCancellationToken))]
+        public ActionResult<Contact> ActionWithInferredFromBodyParameterAndCancellationToken(Contact contact, CancellationToken cts)
+            => contact;
+
         [HttpPost("ActionWithInferredRouteAndQueryParameters/{name}/{id}")]
         public ActionResult<Contact> ActionWithInferredRouteAndQueryParameter(int id, string name, string email)
         {
@@ -60,6 +65,12 @@ namespace BasicWebSite
                 Name = name,
                 Email = email,
             };
+        }
+
+        [HttpGet("[action]")]
+        public ActionResult<Contact> ActionWithInferredEmptyPrefix([FromQuery] Contact contact)
+        {
+            return contact;
         }
     }
 }

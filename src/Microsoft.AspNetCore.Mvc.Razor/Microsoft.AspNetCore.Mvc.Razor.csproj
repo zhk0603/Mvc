@@ -6,6 +6,8 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageTags>aspnetcore;aspnetcoremvc;cshtml;razor</PackageTags>
+    <NuspecFile>$(MSBuildProjectName).nuspec</NuspecFile>
+    <Serviceable>true</Serviceable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,4 +24,37 @@
     <PackageReference Include="Microsoft.Extensions.PropertyActivator.Sources" PrivateAssets="All" Version="$(MicrosoftExtensionsPropertyActivatorSourcesPackageVersion)" />
     <PackageReference Include="Microsoft.Extensions.PropertyHelper.Sources" PrivateAssets="All" Version="$(MicrosoftExtensionsPropertyHelperSourcesPackageVersion)" />
   </ItemGroup>
+
+  <Target Name="PopulateNuspec" BeforeTargets="GenerateNuspec" DependsOnTargets="BuiltProjectOutputGroup;DebugSymbolsProjectOutputGroup;DocumentationProjectOutputGroup">
+
+    <PropertyGroup>
+      <!-- Make sure we create a symbols.nupkg -->
+      <IncludeSymbols>true</IncludeSymbols>
+      <NuspecProperties>
+        id=$(MSBuildProjectName);
+        version=$(PackageVersion);
+        authors=$(Authors);
+        licenseUrl=$(PackageLicenseUrl);
+        projectUrl=$(PackageProjectUrl);
+        iconUrl=$(PackageIconUrl);
+        copyright=$(Copyright);
+        description=$(Description);
+        tags=$([MSBuild]::Escape($(PackageTags)));
+        serviceable=$(Serviceable);
+        repositoryUrl=$(RepositoryUrl);
+        repositoryCommit=$(RepositoryCommit);
+        targetframework=$(TargetFramework);
+        MicrosoftAspNetCoreMvcRazorExtensionsPackageVersion=$(MicrosoftAspNetCoreMvcRazorExtensionsPackageVersion);
+        MicrosoftAspNetCoreRazorRuntimePackageVersion=$(MicrosoftAspNetCoreRazorRuntimePackageVersion);
+        MicrosoftCodeAnalysisRazorPackageVersion=$(MicrosoftCodeAnalysisRazorPackageVersion);
+        MicrosoftCodeAnalysisCSharpPackageVersion=$(MicrosoftCodeAnalysisCSharpPackageVersion);
+        MicrosoftExtensionsCachingMemoryPackageVersion=$(MicrosoftExtensionsCachingMemoryPackageVersion);
+        MicrosoftExtensionsFileProvidersCompositePackageVersion=$(MicrosoftExtensionsFileProvidersCompositePackageVersion);
+        MicrosoftDiaSymReaderNativePackageVersion=$(MicrosoftDiaSymReaderNativePackageVersion);
+        OutputBinary=@(BuiltProjectOutputGroupOutput);
+        OutputDocumentation=@(DocumentationProjectOutputGroupOutput);
+        OutputSymbol=@(DebugSymbolsProjectOutputGroupOutput);
+      </NuspecProperties>
+    </PropertyGroup>
+  </Target>
 </Project>

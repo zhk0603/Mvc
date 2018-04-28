@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Mvc.Internal;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Microsoft.AspNetCore.Mvc.Razor;
@@ -191,18 +192,15 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 .Setup(f => f.CreateFactory("/_ViewStart.cshtml"))
                 .Returns(new RazorPageFactoryResult(new CompiledViewDescriptor(), factory2));
 
-            var fileProvider = new TestFileProvider();
-            fileProvider.AddFile("/Home/Path1/_ViewStart.cshtml", "content1");
-            fileProvider.AddFile("/_ViewStart.cshtml", "content2");
-            var accessor = Mock.Of<IRazorViewEngineFileProviderAccessor>(a => a.FileProvider == fileProvider);
-
-            var defaultFileSystem = new FileProviderRazorProjectFileSystem(accessor, _hostingEnvironment);
+            var fileSystem = new VirtualRazorProjectFileSystem();
+            fileSystem.Add(new TestRazorProjectItem("/Home/Path1/_ViewStart.cshtml", "content1"));
+            fileSystem.Add(new TestRazorProjectItem("/_ViewStart.cshtml", "content2"));
 
             var invokerProvider = CreateInvokerProvider(
                 loader.Object,
                 CreateActionDescriptorCollection(descriptor),
                 razorPageFactoryProvider: razorPageFactoryProvider.Object,
-                fileSystem: defaultFileSystem);
+                fileSystem: fileSystem);
 
             var context = new ActionInvokerProviderContext(new ActionContext()
             {
@@ -487,10 +485,16 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
             var modelMetadataProvider = TestModelMetadataProvider.CreateDefaultProvider();
             var modelBinderFactory = TestModelBinderFactory.CreateDefault();
+            var mvcOptions = new MvcOptions
+            {
+                AllowValidatingTopLevelNodes = true,
+            };
+
             var parameterBinder = new ParameterBinder(
                 modelMetadataProvider,
                 TestModelBinderFactory.CreateDefault(),
-                Mock.Of<IModelValidatorProvider>(),
+                Mock.Of<IObjectModelValidator>(),
+                Options.Create(mvcOptions),
                 NullLoggerFactory.Instance);
 
             return new PageActionInvokerProvider(
@@ -509,7 +513,8 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 Mock.Of<IPageHandlerMethodSelector>(),
                 fileSystem,
                 new DiagnosticListener("Microsoft.AspNetCore"),
-                NullLoggerFactory.Instance);
+                NullLoggerFactory.Instance,
+                new ActionResultTypeMapper());
         }
 
         private IActionDescriptorCollectionProvider CreateActionDescriptorCollection(PageActionDescriptor descriptor)

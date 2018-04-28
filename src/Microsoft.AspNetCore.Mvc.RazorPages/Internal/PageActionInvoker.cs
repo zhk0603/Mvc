@@ -9,12 +9,14 @@ using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Internal;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Mvc.ViewFeatures.Internal;
+using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
@@ -42,6 +44,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             IPageHandlerMethodSelector handlerMethodSelector,
             DiagnosticSource diagnosticSource,
             ILogger logger,
+            IActionResultTypeMapper mapper,
             PageContext pageContext,
             IFilterMetadata[] filterMetadata,
             PageActionInvokerCacheEntry cacheEntry,
@@ -51,6 +54,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             : base(
                   diagnosticSource,
                   logger,
+                  mapper,
                   pageContext,
                   filterMetadata,
                   pageContext.ValueProviderFactories)
@@ -100,6 +104,35 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             {
                 CacheEntry.ReleasePage(_pageContext, _viewContext, _page);
             }
+        }
+
+        protected override Task InvokeResultAsync(IActionResult result)
+        {
+            // We also have some special initialization we need to do for PageResult.
+            if (result is PageResult pageResult)
+            {
+                // If we used a PageModel then the Page isn't initialized yet.
+                if (_viewContext == null)
+                {
+                    _viewContext = new ViewContext(
+                        _pageContext,
+                        NullView.Instance,
+                        _pageContext.ViewData,
+                        _tempDataFactory.GetTempData(_pageContext.HttpContext),
+                        TextWriter.Null,
+                        _htmlHelperOptions);
+                    _viewContext.ExecutingFilePath = _pageContext.ActionDescriptor.RelativePath;
+                }
+
+                if (_page == null)
+                {
+                    _page = (PageBase)CacheEntry.PageFactory(_pageContext, _viewContext);
+                }
+                pageResult.Page = _page;
+                pageResult.ViewData = pageResult.ViewData ?? _pageContext.ViewData;
+            }
+
+            return base.InvokeResultAsync(result);
         }
 
         private object CreateInstance()
@@ -162,7 +195,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             }
 
             // We do two separate cache lookups, once for the binder and once for the executor.
-            // Reduding it to a single lookup requires a lot of code change with little value.
+            // Reducing it to a single lookup requires a lot of code change with little value.
             PageHandlerBinderDelegate handlerBinder = null;
             for (var i = 0; i < _actionDescriptor.HandlerMethods.Count; i++)
             {
@@ -194,11 +227,8 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 {
                     // Do nothing, already set the value.
                 }
-                else if (parameter.ParameterInfo.HasDefaultValue)
-                {
-                    value = parameter.ParameterInfo.DefaultValue;
-                }
-                else if (parameter.ParameterInfo.ParameterType.IsValueType)
+                else if (!ParameterDefaultValue.TryGetDefaultValue(parameter.ParameterInfo, out value) &&
+                    parameter.ParameterInfo.ParameterType.IsValueType)
                 {
                     value = Activator.CreateInstance(parameter.ParameterInfo.ParameterType);
                 }
@@ -248,28 +278,10 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 _result = new PageResult();
             }
 
-            // We also have some special initialization we need to do for PageResult.
+            // Ensure ViewData is set on PageResult for backwards compatibility (For example, Identity UI accesses
+            // ViewData in a PageFilter's PageHandlerExecutedMethod)
             if (_result is PageResult pageResult)
             {
-                // If we used a PageModel then the Page isn't initialized yet.
-                if (_viewContext == null)
-                {
-                    _viewContext = new ViewContext(
-                        _pageContext,
-                        NullView.Instance,
-                        _pageContext.ViewData,
-                        _tempDataFactory.GetTempData(_pageContext.HttpContext),
-                        TextWriter.Null,
-                        _htmlHelperOptions);
-                    _viewContext.ExecutingFilePath = _pageContext.ActionDescriptor.RelativePath;
-                }
-
-                if (_page == null)
-                {
-                    _page = (PageBase)CacheEntry.PageFactory(_pageContext, _viewContext);
-                }
-
-                pageResult.Page = _page;
                 pageResult.ViewData = pageResult.ViewData ?? _pageContext.ViewData;
             }
         }

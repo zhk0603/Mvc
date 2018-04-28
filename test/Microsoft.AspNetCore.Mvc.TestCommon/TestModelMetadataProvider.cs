@@ -19,7 +19,7 @@ namespace Microsoft.AspNetCore.Mvc.ModelBinding
         // Creates a provider with all the defaults - includes data annotations
         public static ModelMetadataProvider CreateDefaultProvider(IStringLocalizerFactory stringLocalizerFactory = null)
         {
-            var detailsProviders = new IMetadataDetailsProvider[]
+            var detailsProviders = new List<IMetadataDetailsProvider>
             {
                 new DefaultBindingMetadataProvider(),
                 new DefaultValidationMetadataProvider(),
@@ -28,6 +28,8 @@ namespace Microsoft.AspNetCore.Mvc.ModelBinding
                     stringLocalizerFactory),
                 new DataMemberRequiredBindingMetadataProvider(),
             };
+
+            MvcCoreMvcOptionsSetup.ConfigureAdditionalModelMetadataDetailsProvider(detailsProviders);
 
             var compositeDetailsProvider = new DefaultCompositeMetadataDetailsProvider(detailsProviders);
             return new DefaultModelMetadataProvider(compositeDetailsProvider, Options.Create(new MvcOptions()));
@@ -44,6 +46,8 @@ namespace Microsoft.AspNetCore.Mvc.ModelBinding
                     stringLocalizerFactory: null),
                 new DataMemberRequiredBindingMetadataProvider(),
             };
+
+            MvcCoreMvcOptionsSetup.ConfigureAdditionalModelMetadataDetailsProvider(detailsProviders);
 
             detailsProviders.AddRange(providers);
 
@@ -109,6 +113,15 @@ namespace Microsoft.AspNetCore.Mvc.ModelBinding
 
             var builder = new MetadataBuilder(key);
             _detailsProvider.Builders.Add(builder);
+            return builder;
+        }
+
+        public IMetadataBuilder ForParameter(ParameterInfo parameter)
+        {
+            var key = ModelMetadataIdentity.ForParameter(parameter);
+            var builder = new MetadataBuilder(key);
+            _detailsProvider.Builders.Add(builder);
+
             return builder;
         }
 

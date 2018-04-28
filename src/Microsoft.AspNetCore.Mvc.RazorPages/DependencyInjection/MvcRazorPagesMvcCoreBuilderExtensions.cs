@@ -102,6 +102,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.TryAddEnumerable(
                 ServiceDescriptor.Singleton<IPageApplicationModelProvider, TempDataFilterPageApplicationModelProvider>());
             services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IPageApplicationModelProvider, ViewDataAttributePageApplicationModelProvider>());
+            services.TryAddEnumerable(
                 ServiceDescriptor.Singleton<IPageApplicationModelProvider, ResponseCacheFilterApplicationModelProvider>());
 
             services.TryAddEnumerable(
@@ -118,7 +120,9 @@ namespace Microsoft.Extensions.DependencyInjection
             services.TryAddSingleton<IPageHandlerMethodSelector, DefaultPageHandlerMethodSelector>();
 
             // Page model binding
+#pragma warning disable CS0618 // Type or member is obsolete
             services.TryAddSingleton<PageArgumentBinder, DefaultPageArgumentBinder>();
+#pragma warning restore CS0618 // Type or member is obsolete
 
             // Action executors
             services.TryAddSingleton<PageResultExecutor>();

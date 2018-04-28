@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using BasicWebSite;
 using BasicWebSite.Models;
 using Newtonsoft.Json;
 using Xunit;
@@ -17,7 +16,7 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
     {
         public ApiBehaviorTest(MvcTestFixture<BasicWebSite.Startup> fixture)
         {
-            Client = fixture.Client;
+            Client = fixture.CreateDefaultClient();
         }
 
         public HttpClient Client { get; }
@@ -40,7 +39,7 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
 
             // Assert
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            Assert.Equal("application/problem+json", response.Content.Headers.ContentType.MediaType);
+            Assert.Equal("application/json", response.Content.Headers.ContentType.MediaType);
             var actual = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(await response.Content.ReadAsStringAsync());
             Assert.Collection(
                 actual.OrderBy(kvp => kvp.Key),
@@ -70,18 +69,10 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
                 State = "WA",
                 Zip = "Invalid",
             };
-            var expected = new[]
+            var expected = new Dictionary<string, string[]>
             {
-                new VndError
-                {
-                    Path = "Name",
-                    Message = "The field Name must be a string with a minimum length of 5 and a maximum length of 30.",
-                },
-                new VndError
-                {
-                    Path = "Zip",
-                    Message =  @"The field Zip must match the regular expression '\d{5}'.",
-                },
+                {"Name", new string[] {"The field Name must be a string with a minimum length of 5 and a maximum length of 30."}},
+                {"Zip", new string[]{ @"The field Zip must match the regular expression '\d{5}'."}}
             };
             var contactString = JsonConvert.SerializeObject(contactModel);
 
@@ -91,18 +82,20 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             // Assert
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             Assert.Equal("application/vnd.error+json", response.Content.Headers.ContentType.MediaType);
-            var actual = JsonConvert.DeserializeObject<VndError[]>(await response.Content.ReadAsStringAsync());
-            actual = actual.OrderBy(e => e.Path).ToArray();
-            Assert.Equal(expected.Length, actual.Length);
-            for (var i = 0; i < expected.Length; i++)
-            {
-                Assert.Equal(expected[i].Path, expected[i].Path);
-                Assert.Equal(expected[i].Message, expected[i].Message);
-            }
+            var content = await response.Content.ReadAsStringAsync();
+            var actual = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(content);
+            Assert.Equal(expected, actual);
         }
 
         [Fact]
-        public async Task ActionsWithApiBehavior_InferFromBodyParameters()
+        public Task ActionsWithApiBehavior_InferFromBodyParameters()
+            => ActionsWithApiBehaviorInferFromBodyParameters("ActionWithInferredFromBodyParameter");
+
+        [Fact]
+        public Task ActionsWithApiBehavior_InferFromBodyParameters_DoNotConsiderCancellationTokenSourceParameter()
+            => ActionsWithApiBehaviorInferFromBodyParameters("ActionWithInferredFromBodyParameterAndCancellationToken");
+
+        private async Task ActionsWithApiBehaviorInferFromBodyParameters(string action)
         {
             // Arrange
             var input = new Contact
@@ -112,7 +105,7 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             };
 
             // Act
-            var response = await Client.PostAsJsonAsync("/contact/ActionWithInferredFromBodyParameter", input);
+            var response = await Client.PostAsJsonAsync($"/contact/{action}", input);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -137,6 +130,48 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             Assert.Equal(id, result.ContactId);
             Assert.Equal(name, result.Name);
             Assert.Equal(email, result.Email);
+        }
+
+        [Fact]
+        public async Task ActionsWithApiBehavior_InferEmptyPrefixForComplexValueProviderModel_Success()
+        {
+            // Arrange
+            var id = 31;
+            var name = "test_user";
+            var email = "email@test.com";
+            var url = $"/contact/ActionWithInferredEmptyPrefix?name={name}&contactid={id}&email={email}";
+
+            // Act
+            var response = await Client.GetAsync(url);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var result = await response.Content.ReadAsAsync<Contact>();
+            Assert.Equal(id, result.ContactId);
+            Assert.Equal(name, result.Name);
+            Assert.Equal(email, result.Email);
+        }
+
+        [Fact]
+        public async Task ActionsWithApiBehavior_InferEmptyPrefixForComplexValueProviderModel_Ignored()
+        {
+            // Arrange
+            var id = 31;
+            var name = "test_user";
+            var email = "email@test.com";
+            var url = $"/contact/ActionWithInferredEmptyPrefix?contact.name={name}&contact.contactid={id}&contact.email={email}";
+
+            // Act
+            var response = await Client.GetAsync(url);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var result = await response.Content.ReadAsAsync<Contact>();
+            Assert.Equal(0, result.ContactId);
+            Assert.Null(result.Name);
+            Assert.Null(result.Email);
         }
     }
 }

@@ -5,6 +5,10 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Mvc.FunctionalTests
@@ -13,10 +17,16 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
     {
         public GlobalAuthorizationFilterTest(MvcTestFixture<SecurityWebSite.StartupWithGlobalDenyAnonymousFilter> fixture)
         {
-            Client = fixture.Client;
+            Factory = fixture.Factories.FirstOrDefault() ?? fixture.WithWebHostBuilder(ConfigureWebHostBuilder);
+            Client = Factory.CreateDefaultClient();
         }
 
+        private static void ConfigureWebHostBuilder(IWebHostBuilder builder) =>
+            builder.UseStartup<SecurityWebSite.StartupWithGlobalDenyAnonymousFilter>();
+
         public HttpClient Client { get; }
+
+        public WebApplicationFactory<SecurityWebSite.StartupWithGlobalDenyAnonymousFilter> Factory { get; }
 
         [Fact]
         public async Task DeniesAnonymousUsers_ByDefault()
@@ -45,10 +55,15 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
         }
 
         [Fact]
-        public async Task AuthorizationPoliciesDoNotCombineByDefault()
+        public async Task AuthorizationPoliciesDoNotCombine_WithV2_0()
         {
             // Arrange & Act
-            var response = await Client.PostAsync("http://localhost/Administration/SignInCookie2", null);
+            var factory = Factory.WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services => services.Configure<MvcCompatibilityOptions>(
+                        options => options.CompatibilityVersion = CompatibilityVersion.Version_2_0)));
+            var client = factory.CreateDefaultClient();
+            var response = await client.PostAsync("http://localhost/Administration/SignInCookie2", null);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -59,14 +74,37 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/Administration/EitherCookie");
             request.Headers.Add("Cookie", cookie2);
 
-            // Will fail because default cookie is not sent so [Authorize] fails
-            response = await Client.SendAsync(request);
+            // Will fail because default cookie is not sent so [Authorize] fails.
+            response = await client.SendAsync(request);
             Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
             Assert.NotNull(response.Headers.Location);
             Assert.Equal(
                 "http://localhost/Home/Login?ReturnUrl=%2FAdministration%2FEitherCookie",
                 response.Headers.Location.ToString());
-         }
-        
-    }
+        }
+
+        [Fact]
+        public async Task AuthorizationPoliciesCombine_WithV2_1()
+        {
+            // Arrange & Act 1
+            var response = await Client.PostAsync("http://localhost/Administration/SignInCookie2", null);
+
+            // Assert 1
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(response.Headers.Contains("Set-Cookie"));
+
+            // Arrange 2
+            var cookie2 = response.Headers.GetValues("Set-Cookie").SingleOrDefault();
+            var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/Administration/EitherCookie");
+            request.Headers.Add("Cookie", cookie2);
+
+            // Act 2: Will succeed because, with AllowCombiningAuthorizeFilters true, [Authorize] allows either cookie.
+            response = await Client.SendAsync(request);
+
+            // Assert 2
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Null(response.Headers.Location);
+        }
+
+   }
 }

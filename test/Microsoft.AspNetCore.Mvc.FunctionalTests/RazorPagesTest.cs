@@ -3,12 +3,17 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Testing;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Mvc.FunctionalTests
@@ -19,8 +24,12 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
 
         public RazorPagesTest(MvcTestFixture<RazorPagesWebSite.Startup> fixture)
         {
-            Client = fixture.Client;
+            var factory = fixture.Factories.FirstOrDefault() ?? fixture.WithWebHostBuilder(ConfigureWebHostBuilder);
+            Client = factory.CreateDefaultClient();
         }
+
+        private static void ConfigureWebHostBuilder(IWebHostBuilder builder) =>
+            builder.UseStartup<RazorPagesWebSite.Startup>();
 
         public HttpClient Client { get; }
 
@@ -380,11 +389,14 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             Assert.StartsWith("Hello, You posted!", content.Trim());
         }
 
-        [Fact]
-        public async Task HelloWorldWithPageModelHandler_CanGetContent()
+        [Theory]
+        [InlineData("GET")]
+        [InlineData("HEAD")]
+        public async Task HelloWorldWithPageModelHandler_CanGetContent(string httpMethod)
         {
             // Arrange
-            var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/HelloWorldWithPageModelHandler?message=pagemodel");
+            var url = "http://localhost/HelloWorldWithPageModelHandler?message=pagemodel";
+            var request = new HttpRequestMessage(new HttpMethod(httpMethod), url);
 
             // Act
             var response = await Client.SendAsync(request);
@@ -835,7 +847,6 @@ Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary`1[AspNetCore.InjectedPa
             Assert.Equal(expected, response.Headers.Location.ToString());
         }
 
-
         [Fact]
         public async Task RedirectToSelfWorks()
         {
@@ -1142,15 +1153,15 @@ Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary`1[AspNetCore.InjectedPa
         }
 
         [Fact]
-        public async Task BindPropertyAttribute_CanBeAppliedToModelType()
+        public async Task BindPropertiesAttribute_CanBeAppliedToModelType()
         {
             // Arrange
             var expected = "Property1 = 123, Property2 = 25,";
-            var request = new HttpRequestMessage(HttpMethod.Post, "/Pages/PropertyBinding/BindPropertyOnModel?Property1=123")
+            var request = new HttpRequestMessage(HttpMethod.Post, "/Pages/PropertyBinding/BindPropertiesOnModel?Property1=123")
             {
-                Content = new FormUrlEncodedContent(new[]
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
                 {
-                    new KeyValuePair<string, string>("Property2", "25"),
+                    { "Property2", "25" },
                 }),
             };
             await AddAntiforgeryHeaders(request);
@@ -1165,11 +1176,26 @@ Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary`1[AspNetCore.InjectedPa
         }
 
         [Fact]
+        public async Task BindPropertiesAttribute_CanBeAppliedToModelType_AllowsBindingOnGet()
+        {
+            // Arrange
+            var url = "/Pages/PropertyBinding/BindPropertiesWithSupportsGetOnModel?Property=Property-Value";
+
+            // Act
+            var response = await Client.GetAsync(url);
+
+            // Assert
+            await response.AssertStatusCodeAsync(HttpStatusCode.OK);
+            var content = await response.Content.ReadAsStringAsync();
+            Assert.Equal("Property-Value", content.Trim());
+        }
+
+        [Fact]
         public async Task BindingInfoOnPropertiesIsPreferredToBindingInfoOnType()
         {
             // Arrange
             var expected = "Property1 = 123, Property2 = 25,";
-            var request = new HttpRequestMessage(HttpMethod.Post, "/Pages/PropertyBinding/BindPropertyOnModel?Property1=123")
+            var request = new HttpRequestMessage(HttpMethod.Post, "/Pages/PropertyBinding/BindPropertiesOnModel?Property1=123")
             {
                 Content = new FormUrlEncodedContent(new[]
                 {
@@ -1241,6 +1267,57 @@ Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary`1[AspNetCore.InjectedPa
 
             // Assert
             Assert.Equal("<p>Hey, it's Mr. totally custom here!</p>", content.Trim());
+        }
+
+        [Fact]
+        public async Task Page_Handler_BindsToDefaultValues()
+        {
+            // Arrange
+            string expected;
+            using (new CultureReplacer(CultureInfo.InvariantCulture, CultureInfo.InvariantCulture))
+            {
+                expected = $"id: 10, guid: {default(Guid)}, boolean: {default(bool)}, dateTime: {default(DateTime)}";
+            }
+
+            // Act
+            var content = await Client.GetStringAsync("http://localhost/ModelHandlerTestPage/DefaultValues");
+
+            // Assert
+            Assert.Equal(expected, content);
+        }
+
+        [Theory]
+        [InlineData(nameof(IAuthorizationFilter.OnAuthorization))]
+        [InlineData(nameof(IAsyncAuthorizationFilter.OnAuthorizationAsync))]
+        public async Task PageResultSetAt_AuthorizationFilter_Works(string targetName)
+        {
+            // Act
+            var content = await Client.GetStringAsync("http://localhost/Pages/ShortCircuitPageAtAuthFilter?target=" + targetName);
+
+            // Assert
+            Assert.Equal("From ShortCircuitPageAtAuthFilter.cshtml", content);
+        }
+
+        [Theory]
+        [InlineData(nameof(IPageFilter.OnPageHandlerExecuting))]
+        [InlineData(nameof(IAsyncPageFilter.OnPageHandlerExecutionAsync))]
+        public async Task PageResultSetAt_PageFilter_Works(string targetName)
+        {
+            // Act
+            var content = await Client.GetStringAsync("http://localhost/Pages/ShortCircuitPageAtPageFilter?target=" + targetName);
+
+            // Assert
+            Assert.Equal("From ShortCircuitPageAtPageFilter.cshtml", content);
+        }
+
+        [Fact]
+        public async Task ViewDataAvaialableInPageFilter_AfterHandlerMethod_ReturnsPageResult()
+        {
+            // Act
+            var content = await Client.GetStringAsync("http://localhost/Pages/ViewDataAvailableAfterHandlerExecuted");
+
+            // Assert
+            Assert.Equal("ViewData: Bar", content);
         }
 
         private async Task AddAntiforgeryHeaders(HttpRequestMessage request)

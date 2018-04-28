@@ -6,7 +6,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -37,11 +36,13 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
         private readonly ParameterBinder _parameterBinder;
         private readonly IModelMetadataProvider _modelMetadataProvider;
         private readonly ITempDataDictionaryFactory _tempDataFactory;
+        private readonly MvcOptions _mvcOptions;
         private readonly HtmlHelperOptions _htmlHelperOptions;
         private readonly IPageHandlerMethodSelector _selector;
         private readonly RazorProjectFileSystem _razorFileSystem;
         private readonly DiagnosticSource _diagnosticSource;
         private readonly ILogger<PageActionInvoker> _logger;
+        private readonly IActionResultTypeMapper _mapper;
         private volatile InnerCache _currentCache;
 
         public PageActionInvokerProvider(
@@ -60,7 +61,8 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             IPageHandlerMethodSelector selector,
             RazorProjectFileSystem razorFileSystem,
             DiagnosticSource diagnosticSource,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IActionResultTypeMapper mapper)
         {
             _loader = loader;
             _pageFactoryProvider = pageFactoryProvider;
@@ -73,11 +75,13 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             _parameterBinder = parameterBinder;
             _modelMetadataProvider = modelMetadataProvider;
             _tempDataFactory = tempDataFactory;
+            _mvcOptions = mvcOptions.Value;
             _htmlHelperOptions = htmlHelperOptions.Value;
             _selector = selector;
             _razorFileSystem = razorFileSystem;
             _diagnosticSource = diagnosticSource;
             _logger = loggerFactory.CreateLogger<PageActionInvoker>();
+            _mapper = mapper;
         }
 
         public int Order { get; } = -1000;
@@ -157,6 +161,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 _selector,
                 _diagnosticSource,
                 _logger,
+                _mapper,
                 pageContext,
                 filters,
                 cacheEntry,
@@ -261,7 +266,8 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     _modelMetadataProvider,
                     _modelBinderFactory,
                     actionDescriptor,
-                    actionDescriptor.HandlerMethods[i]);
+                    actionDescriptor.HandlerMethods[i],
+                    _mvcOptions);
             }
 
             return results;

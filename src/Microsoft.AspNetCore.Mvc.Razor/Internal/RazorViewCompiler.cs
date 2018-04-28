@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Mvc.Razor.Compilation;
 using Microsoft.AspNetCore.Razor.Hosting;
 using Microsoft.AspNetCore.Razor.Language;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.FileProviders;
@@ -97,17 +98,19 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
 
             foreach (var precompiledView in precompiledViews)
             {
-                if (_precompiledViews.TryGetValue(precompiledView.RelativePath, out var otherValue))
-                {
-                    var message = string.Join(
-                        Environment.NewLine,
-                        Resources.RazorViewCompiler_ViewPathsDifferOnlyInCase,
-                        otherValue.RelativePath,
-                        precompiledView.RelativePath);
-                    throw new InvalidOperationException(message);
-                }
+                logger.ViewCompilerLocatedCompiledView(precompiledView.RelativePath);
 
-                _precompiledViews.Add(precompiledView.RelativePath, precompiledView);
+                if (!_precompiledViews.ContainsKey(precompiledView.RelativePath))
+                {
+                    // View ordering has precedence semantics, a view with a higher precedence was
+                    // already added to the list.
+                    _precompiledViews.Add(precompiledView.RelativePath, precompiledView);
+                }
+            }
+
+            if (_precompiledViews.Count == 0)
+            {
+                logger.ViewCompilerNoCompiledViewsFound();
             }
         }
 
@@ -121,13 +124,12 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
 
             // Attempt to lookup the cache entry using the passed in path. This will succeed if the path is already
             // normalized and a cache entry exists.
-            Task<CompiledViewDescriptor> cachedResult;
-            if (_cache.TryGetValue(relativePath, out cachedResult))
+            if (_cache.TryGetValue(relativePath, out Task<CompiledViewDescriptor> cachedResult))
             {
                 return cachedResult;
             }
 
-            var normalizedPath =  GetNormalizedPath(relativePath);
+            var normalizedPath = GetNormalizedPath(relativePath);
             if (_cache.TryGetValue(normalizedPath, out cachedResult))
             {
                 return cachedResult;
@@ -157,6 +159,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
 
                 if (_precompiledViews.TryGetValue(normalizedPath, out var precompiledView))
                 {
+                    _logger.ViewCompilerLocatedCompiledViewForPath(normalizedPath);
                     item = CreatePrecompiledWorkItem(normalizedPath, precompiledView);
                 }
                 else
@@ -204,6 +207,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
                     return taskSource.Task;
                 }
 
+                _logger.ViewCompilerInvalidingCompiledFile(item.NormalizedPath);
                 try
                 {
                     var descriptor = CompileAndEmit(normalizedPath);
@@ -284,6 +288,8 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
             var projectItem = _projectEngine.FileSystem.GetItem(normalizedPath);
             if (!projectItem.Exists)
             {
+                _logger.ViewCompilerCouldNotFindFileAtPath(normalizedPath);
+
                 // If the file doesn't exist, we can't do compilation right now - we still want to cache
                 // the fact that we tried. This will allow us to retrigger compilation if the view file
                 // is added.
@@ -303,6 +309,8 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
                 };
             }
 
+            _logger.ViewCompilerFoundFileToCompile(normalizedPath);
+
             // OK this means we can do compilation. For now let's just identify the other files we need to watch
             // so we can create the cache entry. Compilation will happen after we release the lock.
 
@@ -313,7 +321,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
             // error message; for now, lets just be extra protective and assume 0 imports to not give a bad error.
             var imports = importFeature?.GetImports(projectItem) ?? Enumerable.Empty<RazorProjectItem>();
             var physicalImports = imports.Where(import => import.FilePath != null);
-            
+
             // Now that we have non-dynamic imports we need to get their RazorProjectItem equivalents so we have their
             // physical file paths (according to the FileSystem).
             foreach (var physicalImport in physicalImports)
@@ -362,13 +370,16 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
             var assemblyName = Path.GetRandomFileName();
             var compilation = CreateCompilation(generatedCode, assemblyName);
 
+            var emitOptions = _csharpCompiler.EmitOptions;
+            var emitPdbFile = _csharpCompiler.EmitPdb && emitOptions.DebugInformationFormat != DebugInformationFormat.Embedded;
+
             using (var assemblyStream = new MemoryStream())
-            using (var pdbStream = new MemoryStream())
+            using (var pdbStream = emitPdbFile ? new MemoryStream() : null)
             {
                 var result = compilation.Emit(
                     assemblyStream,
                     pdbStream,
-                    options: _csharpCompiler.EmitOptions);
+                    options: emitOptions);
 
                 if (!result.Success)
                 {
@@ -380,9 +391,9 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
                 }
 
                 assemblyStream.Seek(0, SeekOrigin.Begin);
-                pdbStream.Seek(0, SeekOrigin.Begin);
+                pdbStream?.Seek(0, SeekOrigin.Begin);
 
-                var assembly = Assembly.Load(assemblyStream.ToArray(), pdbStream.ToArray());
+                var assembly = Assembly.Load(assemblyStream.ToArray(), pdbStream?.ToArray());
                 _logger.GeneratedCodeToAssemblyCompilationEnd(codeDocument.Source.FilePath, startTimestamp);
 
                 return assembly;
